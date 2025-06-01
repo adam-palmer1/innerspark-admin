@@ -23,6 +23,7 @@ import {
   Dashboard,
   People,
   FormatQuote,
+  Label,
   Analytics,
   AccountCircle,
   Logout,
@@ -59,6 +60,7 @@ const Layout: React.FC = () => {
     { text: 'Dashboard', icon: <Dashboard />, path: '/dashboard' },
     { text: 'Admins', icon: <People />, path: '/admins' },
     { text: 'Affirmations', icon: <FormatQuote />, path: '/affirmations' },
+    { text: 'Tags', icon: <Label />, path: '/tags' },
     { text: 'Analytics', icon: <Analytics />, path: '/analytics' },
   ];
 

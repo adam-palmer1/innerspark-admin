@@ -9,6 +9,7 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Admins from './pages/Admins';
 import Affirmations from './pages/Affirmations';
+import Tags from './pages/Tags';
 import Analytics from './pages/Analytics';
 import Profile from './pages/Profile';
 
@@ -44,6 +45,7 @@ const AppRoutes: React.FC = () => {
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="admins" element={<Admins />} />
         <Route path="affirmations" element={<Affirmations />} />
+        <Route path="tags" element={<Tags />} />
         <Route path="analytics" element={<Analytics />} />
         <Route path="profile" element={<Profile />} />
       </Route>

@@ -56,7 +56,10 @@ const Profile: React.FC = () => {
     setLoading(true);
 
     try {
-      await apiService.changePassword(passwordData.currentPassword, passwordData.newPassword);
+      await apiService.changePassword({
+        currentPassword: passwordData.currentPassword,
+        newPassword: passwordData.newPassword
+      });
       setSuccess('Password changed successfully');
       setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
     } catch (err: any) {

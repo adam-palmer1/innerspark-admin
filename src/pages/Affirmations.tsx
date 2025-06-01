@@ -27,6 +27,7 @@ import {
   MenuItem,
   Checkbox,
   Tooltip,
+  Autocomplete,
 } from '@mui/material';
 import {
   Add,
@@ -34,6 +35,7 @@ import {
   Delete,
   Search,
   DeleteSweep,
+  Close,
 } from '@mui/icons-material';
 import { Affirmation, CreateAffirmationRequest, UpdateAffirmationRequest } from '../types';
 import { apiService } from '../services/api';
@@ -46,15 +48,15 @@ const Affirmations: React.FC = () => {
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState('');
+  const [tagFilter, setTagFilter] = useState('');
   const [languageFilter, setLanguageFilter] = useState('');
   const [openDialog, setOpenDialog] = useState(false);
   const [editingAffirmation, setEditingAffirmation] = useState<Affirmation | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [categories, setCategories] = useState<string[]>([]);
+  const [availableTags, setAvailableTags] = useState<string[]>([]);
+  const [tagInputValue, setTagInputValue] = useState('');
   const [formData, setFormData] = useState<CreateAffirmationRequest & { id?: string }>({
     text: '',
-    category: '',
     tags: [],
     priority: 1,
     language: 'en',
@@ -63,14 +65,22 @@ const Affirmations: React.FC = () => {
   const fetchAffirmations = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await apiService.getAffirmations(
-        page + 1,
-        rowsPerPage,
-        categoryFilter,
-        languageFilter,
-        search
-      );
-      setAffirmations(response.data || []);
+      const response = await apiService.getAffirmations({
+        page: page + 1,
+        limit: rowsPerPage,
+        search: search || undefined,
+        tag: tagFilter || undefined,
+        language: languageFilter || undefined,
+        sortBy: 'createdAt',
+        sortOrder: 'DESC'
+      });
+      console.log('Affirmations response:', response);
+      // Map affirmations to ensure they have an id field
+      const mappedAffirmations = (response.data || []).map(a => ({
+        ...a,
+        id: a.id || a._id || ''
+      }));
+      setAffirmations(mappedAffirmations);
       setTotal(response.total || 0);
     } catch (err: any) {
       setError(err.message || 'Failed to fetch affirmations');
@@ -79,14 +89,15 @@ const Affirmations: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [page, rowsPerPage, categoryFilter, languageFilter, search]);
+  }, [page, rowsPerPage, tagFilter, languageFilter, search]);
 
-  const fetchCategories = async () => {
+  const fetchAvailableTags = async () => {
     try {
-      const cats = await apiService.getCategories();
-      setCategories(cats);
+      const tags = await apiService.getAffirmationTags();
+      setAvailableTags(tags || []);
     } catch (err) {
-      console.error('Failed to fetch categories');
+      console.error('Failed to fetch tags');
+      setAvailableTags([]);
     }
   };
 
@@ -95,7 +106,7 @@ const Affirmations: React.FC = () => {
   }, [fetchAffirmations]);
 
   useEffect(() => {
-    fetchCategories();
+    fetchAvailableTags();
   }, []);
 
   const handleSearch = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -107,9 +118,8 @@ const Affirmations: React.FC = () => {
     if (affirmation) {
       setEditingAffirmation(affirmation);
       setFormData({
-        id: affirmation.id.toString(),
-        text: affirmation.slides?.[0]?.title || affirmation.text || '',
-        category: affirmation.category || '',
+        id: affirmation.id?.toString() || affirmation._id || '',
+        text: affirmation.text || affirmation.slides?.[0]?.title || '',
         tags: affirmation.tags || [],
         priority: affirmation.priority || 1,
         language: affirmation.language || 'en',
@@ -118,7 +128,6 @@ const Affirmations: React.FC = () => {
       setEditingAffirmation(null);
       setFormData({
         text: '',
-        category: '',
         tags: [],
         priority: 1,
         language: 'en',
@@ -132,11 +141,11 @@ const Affirmations: React.FC = () => {
     setEditingAffirmation(null);
     setFormData({
       text: '',
-      category: '',
       tags: [],
       priority: 1,
       language: 'en',
     });
+    setTagInputValue('');
   };
 
   const handleSubmit = async () => {
@@ -144,12 +153,11 @@ const Affirmations: React.FC = () => {
       if (editingAffirmation) {
         const updateData: UpdateAffirmationRequest = {
           text: formData.text,
-          category: formData.category,
           tags: formData.tags,
           priority: formData.priority,
           language: formData.language,
         };
-        await apiService.updateAffirmation(editingAffirmation.id.toString(), updateData);
+        await apiService.updateAffirmation(editingAffirmation.id?.toString() || '', updateData);
       } else {
         await apiService.createAffirmation(formData as CreateAffirmationRequest);
       }
@@ -161,6 +169,10 @@ const Affirmations: React.FC = () => {
   };
 
   const handleDelete = async (affirmationId: string) => {
+    if (!affirmationId) {
+      setError('Invalid affirmation ID');
+      return;
+    }
     if (window.confirm('Are you sure you want to delete this affirmation?')) {
       try {
         await apiService.deleteAffirmation(affirmationId);
@@ -175,7 +187,9 @@ const Affirmations: React.FC = () => {
     if (selectedIds.length === 0) return;
     if (window.confirm(`Are you sure you want to delete ${selectedIds.length} affirmations?`)) {
       try {
-        await apiService.bulkDeleteAffirmations(selectedIds);
+        await apiService.bulkDeleteAffirmations({ 
+          affirmationIds: selectedIds.map(id => parseInt(id)) 
+        });
         setSelectedIds([]);
         fetchAffirmations();
       } catch (err: any) {
@@ -186,13 +200,14 @@ const Affirmations: React.FC = () => {
 
   const handleSelectAll = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.checked) {
-      setSelectedIds(affirmations.map(a => a.id.toString()));
+      setSelectedIds(affirmations.map(a => (a.id || a._id || '').toString()));
     } else {
       setSelectedIds([]);
     }
   };
 
   const handleSelectOne = (id: string) => {
+    if (!id) return;
     setSelectedIds(prev => 
       prev.includes(id) 
         ? prev.filter(selectedId => selectedId !== id)
@@ -248,15 +263,15 @@ const Affirmations: React.FC = () => {
           }}
         />
         <FormControl sx={{ minWidth: 120 }}>
-          <InputLabel>Category</InputLabel>
+          <InputLabel>Tag</InputLabel>
           <Select
-            value={categoryFilter}
-            label="Category"
-            onChange={(e) => setCategoryFilter(e.target.value)}
+            value={tagFilter}
+            label="Tag"
+            onChange={(e) => setTagFilter(e.target.value)}
           >
             <MenuItem value="">All</MenuItem>
-            {categories.map((cat) => (
-              <MenuItem key={cat} value={cat}>{cat}</MenuItem>
+            {availableTags.map((tag) => (
+              <MenuItem key={tag} value={tag}>{tag}</MenuItem>
             ))}
           </Select>
         </FormControl>
@@ -287,7 +302,6 @@ const Affirmations: React.FC = () => {
                 />
               </TableCell>
               <TableCell>Text</TableCell>
-              <TableCell>Category</TableCell>
               <TableCell>Tags</TableCell>
               <TableCell>Priority</TableCell>
               <TableCell>Language</TableCell>
@@ -303,22 +317,19 @@ const Affirmations: React.FC = () => {
               </TableRow>
             ) : affirmations && affirmations.length > 0 ? (
               affirmations.map((affirmation) => (
-                <TableRow key={affirmation.id}>
+                <TableRow key={affirmation.id || affirmation._id}>
                   <TableCell padding="checkbox">
                     <Checkbox
-                      checked={selectedIds.includes(affirmation.id.toString())}
-                      onChange={() => handleSelectOne(affirmation.id.toString())}
+                      checked={selectedIds.includes(affirmation.id?.toString() || '')}
+                      onChange={() => handleSelectOne(affirmation.id?.toString() || '')}
                     />
                   </TableCell>
                   <TableCell>
-                    <Tooltip title={affirmation.slides?.[0]?.title || affirmation.text || 'No text'}>
+                    <Tooltip title={affirmation.text || affirmation.slides?.[0]?.title || 'No text'}>
                       <Typography variant="body2" noWrap sx={{ maxWidth: 200 }}>
-                        {affirmation.slides?.[0]?.title || affirmation.text || 'No text'}
+                        {affirmation.text || affirmation.slides?.[0]?.title || 'No text'}
                       </Typography>
                     </Tooltip>
-                  </TableCell>
-                  <TableCell>
-                    {affirmation.category && <Chip label={affirmation.category} size="small" />}
                   </TableCell>
                   <TableCell>
                     {affirmation.tags?.map((tag) => (
@@ -331,7 +342,7 @@ const Affirmations: React.FC = () => {
                     <IconButton onClick={() => handleOpenDialog(affirmation)} size="small">
                       <Edit />
                     </IconButton>
-                    <IconButton onClick={() => handleDelete(affirmation.id.toString())} size="small">
+                    <IconButton onClick={() => handleDelete(affirmation.id?.toString() || '')} size="small">
                       <Delete />
                     </IconButton>
                   </TableCell>
@@ -376,25 +387,57 @@ const Affirmations: React.FC = () => {
             value={formData.text}
             onChange={(e) => setFormData({ ...formData, text: e.target.value })}
           />
-          <TextField
-            margin="dense"
-            label="Category"
-            fullWidth
-            variant="outlined"
-            value={formData.category}
-            onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-          />
-          <TextField
-            margin="dense"
-            label="Tags (comma-separated)"
-            fullWidth
-            variant="outlined"
-            value={formData.tags.join(', ')}
-            onChange={(e) => setFormData({ 
-              ...formData, 
-              tags: e.target.value.split(',').map(tag => tag.trim()).filter(tag => tag) 
-            })}
-          />
+          <Box sx={{ mt: 2, mb: 1 }}>
+            <Typography variant="body2" color="textSecondary" gutterBottom>
+              Tags
+            </Typography>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
+              {formData.tags.map((tag, index) => (
+                <Chip
+                  key={index}
+                  label={tag}
+                  onDelete={() => {
+                    const newTags = [...formData.tags];
+                    newTags.splice(index, 1);
+                    setFormData({ ...formData, tags: newTags });
+                  }}
+                  deleteIcon={<Close />}
+                  size="small"
+                />
+              ))}
+            </Box>
+            <Autocomplete
+              value={null}
+              inputValue={tagInputValue}
+              onInputChange={(event, newInputValue) => {
+                setTagInputValue(newInputValue);
+              }}
+              onChange={(event, newValue) => {
+                if (newValue && !formData.tags.includes(newValue)) {
+                  setFormData({ ...formData, tags: [...formData.tags, newValue] });
+                  setTagInputValue('');
+                }
+              }}
+              options={availableTags.filter(tag => !formData.tags.includes(tag))}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  variant="outlined"
+                  placeholder="Type to search tags..."
+                  size="small"
+                  fullWidth
+                />
+              )}
+              freeSolo
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' && tagInputValue.trim() && !formData.tags.includes(tagInputValue.trim())) {
+                  event.preventDefault();
+                  setFormData({ ...formData, tags: [...formData.tags, tagInputValue.trim()] });
+                  setTagInputValue('');
+                }
+              }}
+            />
+          </Box>
           <TextField
             margin="dense"
             label="Priority"

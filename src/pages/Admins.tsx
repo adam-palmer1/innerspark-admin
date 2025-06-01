@@ -76,7 +76,7 @@ const Admins: React.FC = () => {
     if (admin) {
       setEditingAdmin(admin);
       setFormData({
-        id: admin.id.toString(),
+        id: admin.id?.toString() || '',
         name: admin.name,
         email: admin.email,
         password: '',
@@ -101,7 +101,7 @@ const Admins: React.FC = () => {
           name: formData.name,
           email: formData.email,
         };
-        await apiService.updateAdmin(editingAdmin.id.toString(), updateData);
+        await apiService.updateAdmin(editingAdmin.id?.toString() || '', updateData);
       } else {
         await apiService.createAdmin(formData as CreateAdminRequest);
       }
@@ -114,11 +114,11 @@ const Admins: React.FC = () => {
 
   const handleToggleActive = async (admin: Admin) => {
     try {
-      const isActive = admin.active ?? admin.isActive ?? false;
+      const isActive = admin.isActive ?? false;
       if (isActive) {
-        await apiService.deactivateAdmin(admin.id.toString());
+        await apiService.deactivateAdmin(admin.id?.toString() || '');
       } else {
-        await apiService.activateAdmin(admin.id.toString());
+        await apiService.activateAdmin(admin.id?.toString() || '');
       }
       fetchAdmins();
     } catch (err: any) {
@@ -198,13 +198,13 @@ const Admins: React.FC = () => {
                   <TableCell>
                     <Box sx={{ display: 'flex', alignItems: 'center' }}>
                       <Switch
-                        checked={admin.active ?? admin.isActive ?? false}
+                        checked={admin.isActive ?? false}
                         onChange={() => handleToggleActive(admin)}
                         size="small"
                       />
                       <Chip
-                        label={(admin.active ?? admin.isActive) ? 'Active' : 'Inactive'}
-                        color={(admin.active ?? admin.isActive) ? 'success' : 'default'}
+                        label={admin.isActive ? 'Active' : 'Inactive'}
+                        color={admin.isActive ? 'success' : 'default'}
                         size="small"
                         sx={{ ml: 1 }}
                       />
@@ -217,7 +217,7 @@ const Admins: React.FC = () => {
                     <IconButton onClick={() => handleOpenDialog(admin)} size="small">
                       <Edit />
                     </IconButton>
-                    <IconButton onClick={() => handleDelete(admin.id.toString())} size="small">
+                    <IconButton onClick={() => handleDelete(admin.id?.toString() || '')} size="small">
                       <Delete />
                     </IconButton>
                   </TableCell>

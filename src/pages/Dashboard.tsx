@@ -33,7 +33,7 @@ const Dashboard: React.FC = () => {
       try {
         const [adminsResponse, affirmationsResponse] = await Promise.all([
           apiService.getAdmins(1, 1),
-          apiService.getAffirmations(1, 1),
+          apiService.getAffirmations({ page: 1, limit: 1 }),
         ]);
 
         setStats({

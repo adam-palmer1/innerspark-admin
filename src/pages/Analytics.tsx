@@ -39,7 +39,7 @@ const Analytics: React.FC = () => {
     const fetchAnalytics = async () => {
       try {
         const [affirmationsResponse] = await Promise.all([
-          apiService.getAffirmations(1, 1000),
+          apiService.getAffirmations({ page: 1, limit: 1000 }),
           apiService.getAffirmationStats().catch(() => ({})),
         ]);
 
