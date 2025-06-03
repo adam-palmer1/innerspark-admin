@@ -17,19 +17,36 @@ export interface AffirmationSlide {
   author?: string;
 }
 
-export interface Affirmation {
-  id: number | string;
+export interface TagObject {
+  id: number;
+  name: string;
+  AffirmationTag: {
+    order: number;
+  };
   _id?: string;
-  text?: string;
-  slides?: AffirmationSlide[];
+}
+
+export interface Affirmation {
+  id: number;
+  _id?: string;
+  text: string;
   tags?: string[];
-  isActive?: boolean;
-  priority?: number;
-  language?: string;
+  tagObjects?: TagObject[];
+  isActive: boolean;
+  language: string;
   author?: string;
+  affirmationTitle?: string;
+  affirmationContent?: string;
+  descriptionContent?: string;
+  practiceContent1?: string;
+  practiceContent2?: string;
+  practiceContent3?: string;
   category?: string;
   createdBy?: number;
   createdByAdmin?: string;
+  lastModifiedBy?: number;
+  lastModifiedByAdmin?: string;
+  lastModifiedAt?: string;
   createdAt: string;
   updatedAt: string;
   isLiked?: boolean;
@@ -60,21 +77,31 @@ export interface UpdateAdminRequest {
 }
 
 export interface CreateAffirmationRequest {
-  text: string;
+  text?: string;
   tags: string[];
   isActive?: boolean;
-  priority?: number;
   language?: string;
   author?: string;
+  affirmationTitle?: string;
+  affirmationContent?: string;
+  descriptionContent?: string;
+  practiceContent1?: string;
+  practiceContent2?: string;
+  practiceContent3?: string;
 }
 
 export interface UpdateAffirmationRequest {
   text?: string;
   tags?: string[];
   isActive?: boolean;
-  priority?: number;
   language?: string;
   author?: string;
+  affirmationTitle?: string;
+  affirmationContent?: string;
+  descriptionContent?: string;
+  practiceContent1?: string;
+  practiceContent2?: string;
+  practiceContent3?: string;
 }
 
 export interface PaginatedResponse<T> {
@@ -131,7 +158,6 @@ export interface BulkUpdate {
   affirmationIds: number[];
   updateData: {
     isActive?: boolean;
-    priority?: number;
     tags?: string[];
   };
 }
@@ -144,7 +170,6 @@ export interface AffirmationStats {
   totalAffirmations: number;
   activeAffirmations: number;
   tagsCount: number;
-  avgPriority: number;
 }
 
 export interface TagStatistics {

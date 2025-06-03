@@ -16,7 +16,6 @@ import {
 } from '@mui/material';
 import {
   BarChart,
-  TrendingUp,
   Category,
   Language,
 } from '@mui/icons-material';
@@ -26,7 +25,6 @@ interface AnalyticsData {
   totalAffirmations: number;
   categoryCounts: { [key: string]: number };
   languageCounts: { [key: string]: number };
-  averagePriority: number;
   recentActivity: any[];
 }
 
@@ -47,7 +45,6 @@ const Analytics: React.FC = () => {
         
         const categoryCounts: { [key: string]: number } = {};
         const languageCounts: { [key: string]: number } = {};
-        let totalPriority = 0;
 
         affirmations.forEach((affirmation) => {
           if (affirmation.category) {
@@ -56,16 +53,12 @@ const Analytics: React.FC = () => {
           if (affirmation.language) {
             languageCounts[affirmation.language] = (languageCounts[affirmation.language] || 0) + 1;
           }
-          if (affirmation.priority !== undefined) {
-            totalPriority += affirmation.priority;
-          }
         });
 
         setAnalytics({
           totalAffirmations: affirmations.length,
           categoryCounts,
           languageCounts,
-          averagePriority: affirmations.length > 0 ? totalPriority / affirmations.length : 0,
           recentActivity: [],
         });
       } catch (err: any) {
@@ -159,14 +152,6 @@ const Analytics: React.FC = () => {
             value={Object.keys(analytics.languageCounts).length}
             icon={<Language sx={{ fontSize: 40 }} />}
             color="#ed6c02"
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <StatCard
-            title="Avg Priority"
-            value={analytics.averagePriority}
-            icon={<TrendingUp sx={{ fontSize: 40 }} />}
-            color="#9c27b0"
           />
         </Grid>
       </Grid>

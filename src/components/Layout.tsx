@@ -16,7 +16,10 @@ import {
   Menu,
   MenuItem,
   Avatar,
-  Divider,
+  Badge,
+  useTheme,
+  alpha,
+  Card,
 } from '@mui/material';
 import {
   Menu as MenuIcon,
@@ -27,6 +30,8 @@ import {
   Analytics,
   AccountCircle,
   Logout,
+  Notifications,
+  Settings,
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -38,6 +43,7 @@ const Layout: React.FC = () => {
   const { admin, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const theme = useTheme();
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
@@ -65,27 +71,83 @@ const Layout: React.FC = () => {
   ];
 
   const drawer = (
-    <div>
-      <Toolbar>
-        <Typography variant="h6" noWrap component="div">
-          InnerSpark Admin
-        </Typography>
-      </Toolbar>
-      <Divider />
-      <List>
+    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <Box sx={{ p: 3, borderBottom: `1px solid ${theme.palette.divider}` }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <Box 
+            sx={{ 
+              width: 40, 
+              height: 40, 
+              borderRadius: 2,
+              background: `linear-gradient(135deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'white',
+              fontWeight: 'bold',
+              fontSize: '1.2rem'
+            }}
+          >
+            IS
+          </Box>
+          <Typography variant="h6" fontWeight="bold" color="primary">
+            InnerSpark
+          </Typography>
+        </Box>
+      </Box>
+      
+      <List sx={{ px: 2, py: 3, flexGrow: 1 }}>
         {menuItems.map((item) => (
-          <ListItem key={item.text} disablePadding>
+          <ListItem key={item.text} disablePadding sx={{ mb: 1 }}>
             <ListItemButton
               selected={location.pathname === item.path}
               onClick={() => navigate(item.path)}
+              sx={{
+                borderRadius: 2,
+                minHeight: 44,
+                px: 2,
+                py: 1.5,
+                '&.Mui-selected': {
+                  backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                  color: theme.palette.primary.main,
+                  '& .MuiListItemIcon-root': {
+                    color: theme.palette.primary.main,
+                  },
+                  '&:hover': {
+                    backgroundColor: alpha(theme.palette.primary.main, 0.15),
+                  },
+                },
+                '&:hover': {
+                  backgroundColor: alpha(theme.palette.action.hover, 0.1),
+                },
+              }}
             >
-              <ListItemIcon>{item.icon}</ListItemIcon>
-              <ListItemText primary={item.text} />
+              <ListItemIcon sx={{ minWidth: 40 }}>
+                {item.icon}
+              </ListItemIcon>
+              <ListItemText 
+                primary={item.text} 
+                primaryTypographyProps={{
+                  fontWeight: location.pathname === item.path ? 600 : 500,
+                  fontSize: '0.875rem',
+                }}
+              />
             </ListItemButton>
           </ListItem>
         ))}
       </List>
-    </div>
+      
+      <Box sx={{ p: 2, borderTop: `1px solid ${theme.palette.divider}` }}>
+        <Card variant="outlined" sx={{ p: 2, bgcolor: alpha(theme.palette.primary.main, 0.05) }}>
+          <Typography variant="body2" fontWeight="600" gutterBottom>
+            Welcome back!
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            {admin?.name}
+          </Typography>
+        </Card>
+      </Box>
+    </Box>
   );
 
   return (
@@ -93,12 +155,16 @@ const Layout: React.FC = () => {
       <CssBaseline />
       <AppBar
         position="fixed"
+        elevation={0}
         sx={{
           width: { sm: `calc(100% - ${drawerWidth}px)` },
           ml: { sm: `${drawerWidth}px` },
+          bgcolor: 'background.paper',
+          color: 'text.primary',
+          borderBottom: `1px solid ${theme.palette.divider}`,
         }}
       >
-        <Toolbar>
+        <Toolbar sx={{ minHeight: 64 }}>
           <IconButton
             color="inherit"
             aria-label="open drawer"
@@ -108,25 +174,45 @@ const Layout: React.FC = () => {
           >
             <MenuIcon />
           </IconButton>
-          <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
-            Admin Panel
-          </Typography>
-          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <Typography variant="body2" sx={{ mr: 1 }}>
-              {admin?.name}
+          
+          <Box sx={{ flexGrow: 1 }}>
+            <Typography variant="h5" fontWeight="600" color="text.primary">
+              {menuItems.find(item => item.path === location.pathname)?.text || 'Dashboard'}
             </Typography>
-            <IconButton
-              size="large"
-              aria-label="account of current user"
-              aria-controls="profile-menu"
-              aria-haspopup="true"
-              onClick={handleProfileMenuOpen}
-              color="inherit"
-            >
-              <Avatar sx={{ width: 32, height: 32 }}>
-                <AccountCircle />
-              </Avatar>
+          </Box>
+          
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <IconButton size="large" color="inherit">
+              <Badge badgeContent={3} color="error">
+                <Notifications />
+              </Badge>
             </IconButton>
+            
+            <IconButton size="large" color="inherit">
+              <Settings />
+            </IconButton>
+            
+            <Box sx={{ ml: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Avatar 
+                sx={{ 
+                  width: 36, 
+                  height: 36,
+                  bgcolor: theme.palette.primary.main,
+                  cursor: 'pointer'
+                }}
+                onClick={handleProfileMenuOpen}
+              >
+                {admin?.name?.charAt(0).toUpperCase()}
+              </Avatar>
+              <Box sx={{ display: { xs: 'none', md: 'block' } }}>
+                <Typography variant="body2" fontWeight="600">
+                  {admin?.name}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Administrator
+                </Typography>
+              </Box>
+            </Box>
           </Box>
         </Toolbar>
       </AppBar>
@@ -193,12 +279,15 @@ const Layout: React.FC = () => {
         component="main"
         sx={{
           flexGrow: 1,
-          p: 3,
+          bgcolor: 'background.default',
+          minHeight: '100vh',
           width: { sm: `calc(100% - ${drawerWidth}px)` },
         }}
       >
-        <Toolbar />
-        <Outlet />
+        <Toolbar sx={{ minHeight: 64 }} />
+        <Box sx={{ p: { xs: 2, sm: 3, md: 4 } }}>
+          <Outlet />
+        </Box>
       </Box>
     </Box>
   );

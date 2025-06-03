@@ -177,7 +177,6 @@ class ApiService {
     sortBy?: string;
     sortOrder?: 'ASC' | 'DESC';
     language?: string;
-    priority?: number;
   }): Promise<PaginatedResponse<Affirmation>> {
     const searchParams = new URLSearchParams({
       page: (params?.page || 1).toString(),
@@ -190,7 +189,6 @@ class ApiService {
     if (params?.sortBy) searchParams.append('sortBy', params.sortBy);
     if (params?.sortOrder) searchParams.append('sortOrder', params.sortOrder);
     if (params?.language) searchParams.append('language', params.language);
-    if (params?.priority) searchParams.append('priority', params.priority.toString());
     
     const response = await this.client.get<ApiResponse<any>>(`/api/admin/affirmations?${searchParams}`);
     if (!response.data.data) {
