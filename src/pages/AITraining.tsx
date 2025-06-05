@@ -822,22 +822,6 @@ const AITraining: React.FC = () => {
           )}
         </DialogContent>
         <DialogActions>
-          {selectedFeedback && !selectedFeedback.isUsed && selectedFeedback.rating >= 4 && (
-            <Button
-              variant="contained"
-              onClick={() => {
-                const queryParams = new URLSearchParams({
-                  prefill: JSON.stringify({
-                    ...selectedFeedback.generatedContent,
-                    tags: selectedFeedback.tags,
-                  }),
-                });
-                window.location.href = `/affirmations?${queryParams}`;
-              }}
-            >
-              Create Affirmation from This
-            </Button>
-          )}
           <Button onClick={() => setSelectedFeedback(null)}>Close</Button>
         </DialogActions>
       </Dialog>
