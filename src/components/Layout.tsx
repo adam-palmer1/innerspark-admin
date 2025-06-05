@@ -16,7 +16,6 @@ import {
   Menu,
   MenuItem,
   Avatar,
-  Badge,
   useTheme,
   alpha,
   Card,
@@ -30,8 +29,7 @@ import {
   Analytics,
   AccountCircle,
   Logout,
-  Notifications,
-  Settings,
+  Psychology,
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -66,6 +64,7 @@ const Layout: React.FC = () => {
     { text: 'Dashboard', icon: <Dashboard />, path: '/dashboard' },
     { text: 'Admins', icon: <People />, path: '/admins' },
     { text: 'Affirmations', icon: <FormatQuote />, path: '/affirmations' },
+    { text: 'AI Training', icon: <Psychology />, path: '/ai-training' },
     { text: 'Tags', icon: <Label />, path: '/tags' },
     { text: 'Analytics', icon: <Analytics />, path: '/analytics' },
   ];
@@ -182,17 +181,7 @@ const Layout: React.FC = () => {
           </Box>
           
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <IconButton size="large" color="inherit">
-              <Badge badgeContent={3} color="error">
-                <Notifications />
-              </Badge>
-            </IconButton>
-            
-            <IconButton size="large" color="inherit">
-              <Settings />
-            </IconButton>
-            
-            <Box sx={{ ml: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <Avatar 
                 sx={{ 
                   width: 36, 

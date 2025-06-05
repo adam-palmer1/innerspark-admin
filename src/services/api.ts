@@ -20,7 +20,16 @@ import {
   BulkDelete,
   AffirmationStats,
   TagStatistics,
-  ChangePasswordRequest
+  ChangePasswordRequest,
+  GenerateAIRequest,
+  GenerateAIResponse,
+  AffirmationFeedback,
+  PromptTemplate,
+  CreateFeedbackRequest,
+  CreateTemplateRequest,
+  UpdateTemplateRequest,
+  FeedbackAnalytics,
+  TemplateStatistics
 } from '../types';
 
 const BASE_URL = process.env.REACT_APP_API_BASE_URL || 'https://api.innerspark.app';
@@ -194,7 +203,7 @@ class ApiService {
     if (!response.data.data) {
       return { data: [], total: 0, page: 1, limit: params?.limit || 20, totalPages: 0 };
     }
-    // Handle the API response with pagination info
+    // Handle the API response with pagination info  
     if (Array.isArray(response.data.data) && response.data.pagination) {
       return {
         data: response.data.data,
@@ -204,14 +213,24 @@ class ApiService {
         totalPages: response.data.pagination.totalPages
       };
     }
-    // Fallback for array without pagination
+    // Fallback for array without pagination - estimate total based on page size
     if (Array.isArray(response.data.data)) {
+      const currentPageItems = response.data.data.length;
+      const requestedLimit = params?.limit || 20;
+      const currentPage = params?.page || 1;
+      
+      // If we got fewer items than requested and we're on page 1, that's probably the total
+      // If we got the full page size, estimate there might be more pages
+      const estimatedTotal = (currentPage === 1 && currentPageItems < requestedLimit) 
+        ? currentPageItems 
+        : currentPageItems * currentPage; // Conservative estimate
+      
       return {
         data: response.data.data,
-        total: response.data.data.length,
-        page: params?.page || 1,
-        limit: params?.limit || 20,
-        totalPages: Math.ceil(response.data.data.length / (params?.limit || 20))
+        total: estimatedTotal,
+        page: currentPage,
+        limit: requestedLimit,
+        totalPages: Math.ceil(estimatedTotal / requestedLimit)
       };
     }
     return response.data.data;
@@ -244,6 +263,10 @@ class ApiService {
     await this.client.delete('/api/admin/affirmations/bulk-delete', { data });
   }
 
+  async generateAIAffirmation(data: GenerateAIRequest): Promise<GenerateAIResponse> {
+    const response = await this.client.post<ApiResponse<GenerateAIResponse>>('/api/admin/affirmations/generate-ai', data);
+    return response.data.data;
+  }
 
   async getAffirmationStats(): Promise<AffirmationStats> {
     const response = await this.client.get<ApiResponse<AffirmationStats>>('/api/admin/affirmations/stats');
@@ -388,6 +411,175 @@ class ApiService {
 
   async refreshTagCounts(): Promise<{ updatedTags: number }> {
     const response = await this.client.post<ApiResponse<{ updatedTags: number }>>('/api/admin/tags/refresh-counts');
+    return response.data.data;
+  }
+
+  // AI Training Methods
+
+  async generateWithTemplate(data: GenerateAIRequest & { templateId?: number }): Promise<GenerateAIResponse> {
+    const response = await this.client.post<ApiResponse<GenerateAIResponse>>('/api/admin/ai-training/generate', data);
+    return response.data.data;
+  }
+
+  async submitFeedback(data: CreateFeedbackRequest): Promise<AffirmationFeedback> {
+    const response = await this.client.post<ApiResponse<AffirmationFeedback>>('/api/admin/ai-training/feedback', data);
+    return response.data.data;
+  }
+
+  async getFeedback(params?: {
+    page?: number;
+    limit?: number;
+    rating?: number;
+    isUsed?: boolean;
+    search?: string;
+    startDate?: string;
+    endDate?: string;
+    tags?: string;
+    sortBy?: string;
+    sortOrder?: 'ASC' | 'DESC';
+  }): Promise<PaginatedResponse<AffirmationFeedback>> {
+    const searchParams = new URLSearchParams();
+    if (params?.page) searchParams.append('page', params.page.toString());
+    if (params?.limit) searchParams.append('limit', params.limit.toString());
+    if (params?.rating) searchParams.append('rating', params.rating.toString());
+    if (params?.isUsed !== undefined) searchParams.append('isUsed', params.isUsed.toString());
+    if (params?.search) searchParams.append('search', params.search);
+    if (params?.startDate) searchParams.append('startDate', params.startDate);
+    if (params?.endDate) searchParams.append('endDate', params.endDate);
+    if (params?.tags) searchParams.append('tags', params.tags);
+    if (params?.sortBy) searchParams.append('sortBy', params.sortBy);
+    if (params?.sortOrder) searchParams.append('sortOrder', params.sortOrder);
+
+    const response = await this.client.get<ApiResponse<any>>(`/api/admin/ai-training/feedback?${searchParams}`);
+    
+    if (Array.isArray(response.data.data) && response.data.pagination) {
+      return {
+        data: response.data.data,
+        total: response.data.pagination.totalItems,
+        page: response.data.pagination.currentPage,
+        limit: response.data.pagination.itemsPerPage,
+        totalPages: response.data.pagination.totalPages
+      };
+    }
+    
+    if (Array.isArray(response.data.data)) {
+      return {
+        data: response.data.data,
+        total: response.data.data.length,
+        page: params?.page || 1,
+        limit: params?.limit || 20,
+        totalPages: Math.ceil(response.data.data.length / (params?.limit || 20))
+      };
+    }
+    
+    return response.data.data;
+  }
+
+  async getFeedbackAnalytics(params?: {
+    startDate?: string;
+    endDate?: string;
+    adminId?: number;
+  }): Promise<FeedbackAnalytics> {
+    const searchParams = new URLSearchParams();
+    if (params?.startDate) searchParams.append('startDate', params.startDate);
+    if (params?.endDate) searchParams.append('endDate', params.endDate);
+    if (params?.adminId) searchParams.append('adminId', params.adminId.toString());
+
+    const response = await this.client.get<ApiResponse<FeedbackAnalytics>>(`/api/admin/ai-training/feedback/analytics?${searchParams}`);
+    return response.data.data;
+  }
+
+  async exportFeedback(params?: {
+    minRating?: number;
+    maxResults?: number;
+  }): Promise<Blob> {
+    const searchParams = new URLSearchParams();
+    if (params?.minRating) searchParams.append('minRating', params.minRating.toString());
+    if (params?.maxResults) searchParams.append('maxResults', params.maxResults.toString());
+
+    const response = await this.client.get(`/api/admin/ai-training/feedback/export?${searchParams}`, {
+      responseType: 'blob'
+    });
+    return response.data;
+  }
+
+  async markFeedbackUsed(id: number, affirmationId: number): Promise<AffirmationFeedback> {
+    const response = await this.client.patch<ApiResponse<AffirmationFeedback>>(`/api/admin/ai-training/feedback/${id}/mark-used`, { affirmationId });
+    return response.data.data;
+  }
+
+  async getTemplates(params?: {
+    page?: number;
+    limit?: number;
+    isActive?: boolean;
+    tags?: string;
+    sortBy?: string;
+    sortOrder?: 'ASC' | 'DESC';
+  }): Promise<PaginatedResponse<PromptTemplate>> {
+    const searchParams = new URLSearchParams();
+    if (params?.page) searchParams.append('page', params.page.toString());
+    if (params?.limit) searchParams.append('limit', params.limit.toString());
+    if (params?.isActive !== undefined) searchParams.append('isActive', params.isActive.toString());
+    if (params?.tags) searchParams.append('tags', params.tags);
+    if (params?.sortBy) searchParams.append('sortBy', params.sortBy);
+    if (params?.sortOrder) searchParams.append('sortOrder', params.sortOrder);
+
+    const response = await this.client.get<ApiResponse<any>>(`/api/admin/ai-training/templates?${searchParams}`);
+    
+    if (Array.isArray(response.data.data) && response.data.pagination) {
+      return {
+        data: response.data.data,
+        total: response.data.pagination.totalItems,
+        page: response.data.pagination.currentPage,
+        limit: response.data.pagination.itemsPerPage,
+        totalPages: response.data.pagination.totalPages
+      };
+    }
+    
+    if (Array.isArray(response.data.data)) {
+      return {
+        data: response.data.data,
+        total: response.data.data.length,
+        page: params?.page || 1,
+        limit: params?.limit || 20,
+        totalPages: Math.ceil(response.data.data.length / (params?.limit || 20))
+      };
+    }
+    
+    return response.data.data;
+  }
+
+  async createTemplate(data: CreateTemplateRequest): Promise<PromptTemplate> {
+    const response = await this.client.post<ApiResponse<PromptTemplate>>('/api/admin/ai-training/templates', data);
+    return response.data.data;
+  }
+
+  async getTemplate(id: number): Promise<PromptTemplate> {
+    const response = await this.client.get<ApiResponse<PromptTemplate>>(`/api/admin/ai-training/templates/${id}`);
+    return response.data.data;
+  }
+
+  async updateTemplate(id: number, data: UpdateTemplateRequest): Promise<PromptTemplate> {
+    const response = await this.client.put<ApiResponse<PromptTemplate>>(`/api/admin/ai-training/templates/${id}`, data);
+    return response.data.data;
+  }
+
+  async deleteTemplate(id: number): Promise<void> {
+    await this.client.delete(`/api/admin/ai-training/templates/${id}`);
+  }
+
+  async toggleTemplateStatus(id: number): Promise<PromptTemplate> {
+    const response = await this.client.patch<ApiResponse<PromptTemplate>>(`/api/admin/ai-training/templates/${id}/toggle-status`);
+    return response.data.data;
+  }
+
+  async getTemplateStatistics(): Promise<TemplateStatistics> {
+    const response = await this.client.get<ApiResponse<TemplateStatistics>>('/api/admin/ai-training/templates/statistics');
+    return response.data.data;
+  }
+
+  async seedDefaultTemplates(): Promise<{ created: number }> {
+    const response = await this.client.post<ApiResponse<{ created: number }>>('/api/admin/ai-training/templates/seed-defaults');
     return response.data.data;
   }
 }

@@ -57,9 +57,9 @@ import {
   Analytics,
   AutoAwesome,
 } from '@mui/icons-material';
+import Rating from '@mui/material/Rating';
 import { Affirmation, CreateAffirmationRequest, UpdateAffirmationRequest } from '../types';
 import { apiService } from '../services/api';
-import { aiService } from '../services/ai';
 
 const Affirmations: React.FC = () => {
   const [affirmations, setAffirmations] = useState<Affirmation[]>([]);
@@ -86,6 +86,63 @@ const Affirmations: React.FC = () => {
   const [generatingAI, setGeneratingAI] = useState(false);
   const [showConfirmAI, setShowConfirmAI] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
+  const [aiRating, setAiRating] = useState<number>(0);
+  const [aiFeedback, setAiFeedback] = useState('');
+  const [aiGenerated, setAiGenerated] = useState(false);
+  const [userEditedFields, setUserEditedFields] = useState<Set<string>>(new Set());
+
+  const handleFieldChange = (fieldName: string, value: string) => {
+    // Only remove trailing periods from affirmationTitle and affirmationContent
+    const cleanedValue = (fieldName === 'affirmationTitle' || fieldName === 'affirmationContent') 
+      ? value.replace(/\.+$/, '') 
+      : value;
+    
+    setFormData({ ...formData, [fieldName]: cleanedValue });
+    
+    // Always update userEditedFields based on whether the field is empty or not
+    if (cleanedValue.trim()) {
+      // Field has content - add to userEditedFields
+      setUserEditedFields(prev => new Set(prev).add(fieldName));
+    } else {
+      // Field is empty - remove from userEditedFields (removes green border)
+      setUserEditedFields(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(fieldName);
+        return newSet;
+      });
+    }
+  };
+
+  const handleKeyDown = (event: React.KeyboardEvent) => {
+    if (event.key === 'Enter' && !event.shiftKey && !saving) {
+      // Prevent default form submission
+      event.preventDefault();
+      // Submit the form
+      handleSubmit();
+    }
+  };
+
+  const getFieldSx = (fieldName: string) => {
+    // Only show green border if field is in userEditedFields AND has content
+    const fieldValue = (formData as any)[fieldName];
+    if (userEditedFields.has(fieldName) && fieldValue && fieldValue.trim()) {
+      return {
+        '& .MuiOutlinedInput-root': {
+          '& fieldset': {
+            borderColor: 'success.main',
+            borderWidth: 2,
+          },
+          '&:hover fieldset': {
+            borderColor: 'success.main',
+          },
+          '&.Mui-focused fieldset': {
+            borderColor: 'success.main',
+          },
+        },
+      };
+    }
+    return undefined;
+  };
   const [formData, setFormData] = useState<CreateAffirmationRequest & { id?: string }>({
     tags: [],
     language: 'en',
@@ -193,6 +250,9 @@ const Affirmations: React.FC = () => {
         practiceContent2: affirmation.practiceContent2 || '',
         practiceContent3: affirmation.practiceContent3 || '',
       });
+      // Don't automatically mark existing content as user-edited
+      // Only fields that the user actually edits will get green borders
+      setUserEditedFields(new Set());
     } else {
       setEditingAffirmation(null);
       setFormData({
@@ -207,6 +267,7 @@ const Affirmations: React.FC = () => {
         practiceContent2: '',
         practiceContent3: '',
       });
+      setUserEditedFields(new Set());
     }
     setOpenDialog(true);
   };
@@ -229,6 +290,10 @@ const Affirmations: React.FC = () => {
     setTagInputValue('');
     setSuccessMessage('');
     setError('');
+    setAiGenerated(false);
+    setAiRating(0);
+    setAiFeedback('');
+    setUserEditedFields(new Set());
   };
 
   const handleSubmit = async () => {
@@ -240,6 +305,30 @@ const Affirmations: React.FC = () => {
     
     try {
       setSaving(true);
+      
+      // Submit feedback if this was AI generated and rated
+      if (aiGenerated && aiRating > 0) {
+        try {
+          await apiService.submitFeedback({
+            rating: aiRating,
+            feedback: aiFeedback || undefined,
+            generatedContent: {
+              affirmationTitle: formData.affirmationTitle || '',
+              affirmationContent: formData.affirmationContent || '',
+              descriptionContent: formData.descriptionContent || '',
+              practiceContent1: formData.practiceContent1 || '',
+              practiceContent2: formData.practiceContent2 || '',
+              practiceContent3: formData.practiceContent3 || '',
+            },
+            tags: formData.tags,
+            language: formData.language,
+          });
+        } catch (feedbackErr) {
+          console.error('Failed to submit feedback:', feedbackErr);
+          // Continue with creation even if feedback fails
+        }
+      }
+      
       if (editingAffirmation) {
         const updateData: UpdateAffirmationRequest = {
           tags: formData.tags,
@@ -368,13 +457,14 @@ const Affirmations: React.FC = () => {
   };
 
   const hasExistingContent = () => {
+    // Only check fields that would actually be overwritten (not user-edited fields with green borders)
     return !!(
-      formData.affirmationTitle ||
-      formData.affirmationContent ||
-      formData.descriptionContent ||
-      formData.practiceContent1 ||
-      formData.practiceContent2 ||
-      formData.practiceContent3
+      (formData.affirmationTitle && !userEditedFields.has('affirmationTitle')) ||
+      (formData.affirmationContent && !userEditedFields.has('affirmationContent')) ||
+      (formData.descriptionContent && !userEditedFields.has('descriptionContent')) ||
+      (formData.practiceContent1 && !userEditedFields.has('practiceContent1')) ||
+      (formData.practiceContent2 && !userEditedFields.has('practiceContent2')) ||
+      (formData.practiceContent3 && !userEditedFields.has('practiceContent3'))
     );
   };
 
@@ -398,19 +488,35 @@ const Affirmations: React.FC = () => {
       setError('');
       setSuccessMessage('');
       
-      const generated = await aiService.generateAffirmation(formData.tags);
+      // Pass existing user data to the API
+      const generated = await apiService.generateAIAffirmation({
+        tags: formData.tags,
+        language: formData.language,
+        affirmationTitle: formData.affirmationTitle || undefined,
+        affirmationContent: formData.affirmationContent || undefined,
+        descriptionContent: formData.descriptionContent || undefined,
+        practiceContent1: formData.practiceContent1 || undefined,
+        practiceContent2: formData.practiceContent2 || undefined,
+        practiceContent3: formData.practiceContent3 || undefined,
+      });
       
+      // Only preserve fields that have been user-edited (green borders)
+      // All other fields get replaced with AI-generated content
       setFormData(prev => ({
         ...prev,
-        affirmationTitle: generated.affirmationTitle,
-        affirmationContent: generated.affirmationContent,
-        descriptionContent: generated.descriptionContent,
-        practiceContent1: generated.practiceContent1,
-        practiceContent2: generated.practiceContent2,
-        practiceContent3: generated.practiceContent3,
+        affirmationTitle: userEditedFields.has('affirmationTitle') ? prev.affirmationTitle : generated.affirmationTitle,
+        affirmationContent: userEditedFields.has('affirmationContent') ? prev.affirmationContent : generated.affirmationContent,
+        descriptionContent: userEditedFields.has('descriptionContent') ? prev.descriptionContent : generated.descriptionContent,
+        practiceContent1: userEditedFields.has('practiceContent1') ? prev.practiceContent1 : generated.practiceContent1,
+        practiceContent2: userEditedFields.has('practiceContent2') ? prev.practiceContent2 : generated.practiceContent2,
+        practiceContent3: userEditedFields.has('practiceContent3') ? prev.practiceContent3 : generated.practiceContent3,
       }));
       
       setShowConfirmAI(false);
+      setSuccessMessage('AI content generated successfully!');
+      setAiGenerated(true);
+      setAiRating(0);
+      setAiFeedback('');
     } catch (err: any) {
       setError(err.message || 'Failed to generate AI content');
     } finally {
@@ -859,7 +965,7 @@ const Affirmations: React.FC = () => {
         </CardContent>
       </Card>
 
-      <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="md" fullWidth>
+      <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="md" fullWidth onKeyDown={handleKeyDown}>
         <DialogTitle>
           {editingAffirmation ? 'Edit Affirmation' : 'Create Affirmation'}
         </DialogTitle>
@@ -960,6 +1066,35 @@ const Affirmations: React.FC = () => {
               </Button>
             </Box>
           </Box>
+          {aiGenerated && (
+            <Box sx={{ mt: 2, p: 2, bgcolor: 'background.default', borderRadius: 2, border: 1, borderColor: 'divider' }}>
+              <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 600, color: 'primary.main' }}>
+                Rate this AI-generated affirmation
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Your feedback helps improve future generations
+              </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                <Typography variant="body2" sx={{ mr: 2 }}>Rating:</Typography>
+                <Rating
+                  value={aiRating}
+                  onChange={(event, newValue) => setAiRating(newValue || 0)}
+                  size="large"
+                />
+              </Box>
+              <TextField
+                label="Feedback (Optional)"
+                multiline
+                rows={2}
+                value={aiFeedback}
+                onChange={(e) => setAiFeedback(e.target.value)}
+                placeholder="What could be improved? What worked well?"
+                fullWidth
+                variant="outlined"
+                size="small"
+              />
+            </Box>
+          )}
           <FormControl fullWidth margin="dense">
             <InputLabel>Language (Optional)</InputLabel>
             <Select
@@ -980,7 +1115,8 @@ const Affirmations: React.FC = () => {
             rows={2}
             variant="outlined"
             value={formData.affirmationContent}
-            onChange={(e) => setFormData({ ...formData, affirmationContent: e.target.value })}
+            onChange={(e) => handleFieldChange('affirmationContent', e.target.value)}
+            sx={getFieldSx('affirmationContent')}
           />
           <TextField
             margin="dense"
@@ -988,9 +1124,10 @@ const Affirmations: React.FC = () => {
             fullWidth
             variant="outlined"
             value={formData.author}
-            onChange={(e) => setFormData({ ...formData, author: e.target.value })}
+            onChange={(e) => handleFieldChange('author', e.target.value)}
             inputProps={{ maxLength: 100 }}
             helperText="Maximum 100 characters"
+            sx={getFieldSx('author')}
           />
           <Divider sx={{ my: 2 }} />
           <Typography variant="subtitle2" sx={{ mb: 2 }}>Additional Content Fields (Optional)</Typography>
@@ -1000,9 +1137,10 @@ const Affirmations: React.FC = () => {
             fullWidth
             variant="outlined"
             value={formData.affirmationTitle}
-            onChange={(e) => setFormData({ ...formData, affirmationTitle: e.target.value })}
+            onChange={(e) => handleFieldChange('affirmationTitle', e.target.value)}
             inputProps={{ maxLength: 500 }}
             helperText="Maximum 500 characters"
+            sx={getFieldSx('affirmationTitle')}
           />
           <TextField
             margin="dense"
@@ -1012,7 +1150,8 @@ const Affirmations: React.FC = () => {
             rows={2}
             variant="outlined"
             value={formData.descriptionContent}
-            onChange={(e) => setFormData({ ...formData, descriptionContent: e.target.value })}
+            onChange={(e) => handleFieldChange('descriptionContent', e.target.value)}
+            sx={getFieldSx('descriptionContent')}
           />
           <TextField
             margin="dense"
@@ -1020,7 +1159,8 @@ const Affirmations: React.FC = () => {
             fullWidth
             variant="outlined"
             value={formData.practiceContent1}
-            onChange={(e) => setFormData({ ...formData, practiceContent1: e.target.value })}
+            onChange={(e) => handleFieldChange('practiceContent1', e.target.value)}
+            sx={getFieldSx('practiceContent1')}
           />
           <TextField
             margin="dense"
@@ -1028,7 +1168,8 @@ const Affirmations: React.FC = () => {
             fullWidth
             variant="outlined"
             value={formData.practiceContent2}
-            onChange={(e) => setFormData({ ...formData, practiceContent2: e.target.value })}
+            onChange={(e) => handleFieldChange('practiceContent2', e.target.value)}
+            sx={getFieldSx('practiceContent2')}
           />
           <TextField
             margin="dense"
@@ -1036,7 +1177,8 @@ const Affirmations: React.FC = () => {
             fullWidth
             variant="outlined"
             value={formData.practiceContent3}
-            onChange={(e) => setFormData({ ...formData, practiceContent3: e.target.value })}
+            onChange={(e) => handleFieldChange('practiceContent3', e.target.value)}
+            sx={getFieldSx('practiceContent3')}
           />
           <FormControlLabel
             control={
@@ -1051,11 +1193,11 @@ const Affirmations: React.FC = () => {
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCloseDialog} disabled={saving || generatingAI}>Cancel</Button>
+          <Button onClick={handleCloseDialog} disabled={saving}>Cancel</Button>
           <Button 
             onClick={handleSubmit} 
             variant="contained"
-            disabled={saving || generatingAI}
+            disabled={saving}
             startIcon={saving ? <CircularProgress size={20} /> : null}
           >
             {saving ? 'Saving...' : (editingAffirmation ? 'Update' : 'Create')}
@@ -1137,39 +1279,42 @@ const Affirmations: React.FC = () => {
             You already have content in some fields. Generating AI content will overwrite:
           </Typography>
           <Box component="ul" sx={{ pl: 2, mb: 2 }}>
-            {formData.affirmationTitle && (
+            {formData.affirmationTitle && !userEditedFields.has('affirmationTitle') && (
               <Typography component="li" variant="body2" color="text.secondary">
                 Affirmation Title
               </Typography>
             )}
-            {formData.affirmationContent && (
+            {formData.affirmationContent && !userEditedFields.has('affirmationContent') && (
               <Typography component="li" variant="body2" color="text.secondary">
                 Affirmation Content
               </Typography>
             )}
-            {formData.descriptionContent && (
+            {formData.descriptionContent && !userEditedFields.has('descriptionContent') && (
               <Typography component="li" variant="body2" color="text.secondary">
                 Description Content
               </Typography>
             )}
-            {formData.practiceContent1 && (
+            {formData.practiceContent1 && !userEditedFields.has('practiceContent1') && (
               <Typography component="li" variant="body2" color="text.secondary">
                 Practice Content 1
               </Typography>
             )}
-            {formData.practiceContent2 && (
+            {formData.practiceContent2 && !userEditedFields.has('practiceContent2') && (
               <Typography component="li" variant="body2" color="text.secondary">
                 Practice Content 2
               </Typography>
             )}
-            {formData.practiceContent3 && (
+            {formData.practiceContent3 && !userEditedFields.has('practiceContent3') && (
               <Typography component="li" variant="body2" color="text.secondary">
                 Practice Content 3
               </Typography>
             )}
           </Box>
-          <Typography variant="body2">
-            Do you want to continue and replace this content?
+          <Typography variant="body2" sx={{ mb: 2 }}>
+            Do you want to continue and replace this content
+          </Typography>
+          <Typography variant="body2" color="success.main" sx={{ fontWeight: 'medium' }}>
+            Note: Fields with green borders (user-entered data) will NOT be overwritten
           </Typography>
         </DialogContent>
         <DialogActions>
@@ -1185,6 +1330,7 @@ const Affirmations: React.FC = () => {
           </Button>
         </DialogActions>
       </Dialog>
+
     </Box>
   );
 };

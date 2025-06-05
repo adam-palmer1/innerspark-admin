@@ -197,3 +197,131 @@ export interface ApiResponse<T> {
   };
   timestamp?: string;
 }
+
+export interface GenerateAIRequest {
+  tags: string[];
+  language?: string;
+  affirmationTitle?: string;
+  affirmationContent?: string;
+  descriptionContent?: string;
+  practiceContent1?: string;
+  practiceContent2?: string;
+  practiceContent3?: string;
+}
+
+export interface GenerateAIResponse {
+  affirmationTitle: string;
+  affirmationContent: string;
+  descriptionContent: string;
+  practiceContent1: string;
+  practiceContent2: string;
+  practiceContent3: string;
+  templateId?: number;
+}
+
+export interface AffirmationFeedback {
+  id: number;
+  affirmationId?: number;
+  rating: number; // 1-5
+  feedback?: string;
+  generatedContent: {
+    affirmationTitle: string;
+    affirmationContent: string;
+    descriptionContent: string;
+    practiceContent1: string;
+    practiceContent2: string;
+    practiceContent3: string;
+  };
+  tags: string[];
+  language: string; // 2-letter code, default 'en'
+  promptVersion?: string;
+  templateId?: number;
+  adminId: number;
+  admin?: Admin;
+  isUsed: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PromptTemplate {
+  id: number;
+  name: string;
+  tags: string[];
+  systemPrompt: string;
+  userPromptTemplate: string;
+  examples?: string[];
+  avgRating: number;
+  usageCount: number;
+  successCount: number;
+  isActive: boolean;
+  version: string;
+  createdBy: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateFeedbackRequest {
+  rating: number;
+  feedback?: string;
+  generatedContent: {
+    affirmationTitle: string;
+    affirmationContent: string;
+    descriptionContent: string;
+    practiceContent1: string;
+    practiceContent2: string;
+    practiceContent3: string;
+  };
+  tags: string[];
+  language?: string;
+  templateId?: number;
+}
+
+export interface CreateTemplateRequest {
+  name: string;
+  tags: string[];
+  systemPrompt: string;
+  userPromptTemplate: string;
+  examples?: string[];
+  version?: string;
+}
+
+export interface UpdateTemplateRequest {
+  name?: string;
+  tags?: string[];
+  systemPrompt?: string;
+  userPromptTemplate?: string;
+  examples?: string[];
+}
+
+export interface FeedbackAnalytics {
+  totalFeedback: number;
+  averageRating: number;
+  ratingDistribution: Array<{
+    rating: number;
+    count: number;
+  }>;
+  topTags: Array<{
+    tag: string;
+    count: number;
+  }>;
+  usageStats: Array<{
+    isUsed: boolean;
+    count: number;
+  }>;
+}
+
+export interface TemplateStatistics {
+  totalTemplates: number;
+  activeTemplates: number;
+  overallAvgRating: number;
+  successRate: number;
+  totalUsage: number;
+  totalSuccess: number;
+  topTemplates: Array<{
+    id: number;
+    name: string;
+    avgRating: number;
+    usageCount: number;
+    successCount: number;
+  }>;
+}
