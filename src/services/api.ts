@@ -31,6 +31,7 @@ import {
   FeedbackAnalytics,
   TemplateStatistics
 } from '../types';
+import { buildSearchParams, handlePaginatedResponse } from '../utils/api';
 
 const BASE_URL = process.env.REACT_APP_API_BASE_URL || 'https://api.innerspark.app';
 
@@ -109,43 +110,9 @@ class ApiService {
   }
 
   async getAdmins(page = 1, limit = 10, search?: string): Promise<PaginatedResponse<Admin>> {
-    const params = new URLSearchParams({
-      page: page.toString(),
-      limit: limit.toString(),
-    });
-    if (search) {
-      params.append('search', search);
-    }
+    const params = buildSearchParams({ page, limit, search });
     const response = await this.client.get<ApiResponse<any>>(`/api/admin/admins?${params}`);
-    
-    // Handle wrapped response with pagination info
-    if (response.data.success && response.data.data && response.data.pagination) {
-      return {
-        data: response.data.data,
-        total: response.data.pagination.totalItems,
-        page: response.data.pagination.currentPage,
-        limit: response.data.pagination.itemsPerPage,
-        totalPages: response.data.pagination.totalPages
-      };
-    }
-    
-    // Handle direct paginated response
-    if (response.data.data && 'data' in response.data.data) {
-      return response.data.data;
-    }
-    
-    // Handle array response
-    if (Array.isArray(response.data.data)) {
-      return {
-        data: response.data.data,
-        total: response.data.data.length,
-        page: page,
-        limit: limit,
-        totalPages: Math.ceil(response.data.data.length / limit)
-      };
-    }
-    
-    return { data: [], total: 0, page: 1, limit: limit, totalPages: 0 };
+    return handlePaginatedResponse<Admin>(response, page, limit);
   }
 
   async createAdmin(data: CreateAdminRequest): Promise<Admin> {
@@ -187,53 +154,23 @@ class ApiService {
     sortOrder?: 'ASC' | 'DESC';
     language?: string;
   }): Promise<PaginatedResponse<Affirmation>> {
-    const searchParams = new URLSearchParams({
-      page: (params?.page || 1).toString(),
-      limit: (params?.limit || 20).toString(),
+    const searchParams = buildSearchParams({
+      page: params?.page || 1,
+      limit: params?.limit || 20,
+      tag: params?.tag,
+      isActive: params?.isActive,
+      search: params?.search,
+      sortBy: params?.sortBy,
+      sortOrder: params?.sortOrder,
+      language: params?.language,
     });
-    
-    if (params?.tag) searchParams.append('tag', params.tag);
-    if (params?.isActive !== undefined) searchParams.append('isActive', params.isActive.toString());
-    if (params?.search) searchParams.append('search', params.search);
-    if (params?.sortBy) searchParams.append('sortBy', params.sortBy);
-    if (params?.sortOrder) searchParams.append('sortOrder', params.sortOrder);
-    if (params?.language) searchParams.append('language', params.language);
     
     const response = await this.client.get<ApiResponse<any>>(`/api/admin/affirmations?${searchParams}`);
     if (!response.data.data) {
       return { data: [], total: 0, page: 1, limit: params?.limit || 20, totalPages: 0 };
     }
-    // Handle the API response with pagination info  
-    if (Array.isArray(response.data.data) && response.data.pagination) {
-      return {
-        data: response.data.data,
-        total: response.data.pagination.totalItems,
-        page: response.data.pagination.currentPage,
-        limit: response.data.pagination.itemsPerPage,
-        totalPages: response.data.pagination.totalPages
-      };
-    }
-    // Fallback for array without pagination - estimate total based on page size
-    if (Array.isArray(response.data.data)) {
-      const currentPageItems = response.data.data.length;
-      const requestedLimit = params?.limit || 20;
-      const currentPage = params?.page || 1;
-      
-      // If we got fewer items than requested and we're on page 1, that's probably the total
-      // If we got the full page size, estimate there might be more pages
-      const estimatedTotal = (currentPage === 1 && currentPageItems < requestedLimit) 
-        ? currentPageItems 
-        : currentPageItems * currentPage; // Conservative estimate
-      
-      return {
-        data: response.data.data,
-        total: estimatedTotal,
-        page: currentPage,
-        limit: requestedLimit,
-        totalPages: Math.ceil(estimatedTotal / requestedLimit)
-      };
-    }
-    return response.data.data;
+    
+    return handlePaginatedResponse<Affirmation>(response, params?.page || 1, params?.limit || 20);
   }
 
   async createAffirmation(data: CreateAffirmationRequest): Promise<Affirmation> {
@@ -304,39 +241,15 @@ class ApiService {
     includeCount?: boolean;
     orderBy?: 'usageCount' | 'name' | 'createdAt';
   }): Promise<PaginatedResponse<Tag>> {
-    const searchParams = new URLSearchParams({
-      page: (params?.page || 1).toString(),
-      limit: (params?.limit || 50).toString(),
-    });
-    
-    if (params?.includeCount !== undefined) {
-      searchParams.append('includeCount', params.includeCount.toString());
-    }
-    if (params?.orderBy) {
-      searchParams.append('orderBy', params.orderBy);
-    }
-
-    const response = await this.client.get<ApiResponse<Tag[]>>(`/api/admin/tags?${searchParams}`);
-    
-    // Handle response with pagination
-    if (response.data.pagination) {
-      return {
-        data: response.data.data,
-        total: response.data.pagination.totalItems,
-        page: response.data.pagination.currentPage,
-        limit: response.data.pagination.itemsPerPage,
-        totalPages: response.data.pagination.totalPages
-      };
-    }
-    
-    // Fallback for array without pagination
-    return {
-      data: response.data.data,
-      total: response.data.data.length,
+    const searchParams = buildSearchParams({
       page: params?.page || 1,
       limit: params?.limit || 50,
-      totalPages: Math.ceil(response.data.data.length / (params?.limit || 50))
-    };
+      includeCount: params?.includeCount,
+      orderBy: params?.orderBy,
+    });
+
+    const response = await this.client.get<ApiResponse<Tag[]>>(`/api/admin/tags?${searchParams}`);
+    return handlePaginatedResponse<Tag>(response, params?.page || 1, params?.limit || 50);
   }
 
   async createTag(data: TagCreate): Promise<Tag> {

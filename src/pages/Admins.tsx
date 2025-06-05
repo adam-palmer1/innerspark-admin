@@ -3,15 +3,6 @@ import {
   Box,
   Typography,
   Button,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
-  TablePagination,
-  TextField,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -19,18 +10,19 @@ import {
   IconButton,
   Switch,
   Alert,
-  CircularProgress,
-  Chip,
-  InputAdornment,
+  TextField,
 } from '@mui/material';
 import {
   Add,
   Edit,
   Delete,
-  Search,
 } from '@mui/icons-material';
 import { Admin, CreateAdminRequest, UpdateAdminRequest } from '../types';
 import { apiService } from '../services/api';
+import DataTable, { Column } from '../components/common/DataTable';
+import StatusChip from '../components/common/StatusChip';
+import SearchBar from '../components/common/SearchBar';
+import { getIdFromRow } from '../utils/api';
 
 const Admins: React.FC = () => {
   const [admins, setAdmins] = useState<Admin[]>([]);
@@ -67,8 +59,8 @@ const Admins: React.FC = () => {
     fetchAdmins();
   }, [page, rowsPerPage, search, fetchAdmins]);
 
-  const handleSearch = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setSearch(event.target.value);
+  const handleSearch = (value: string) => {
+    setSearch(value);
     setPage(0);
   };
 
@@ -137,6 +129,48 @@ const Admins: React.FC = () => {
     }
   };
 
+  const columns: Column<Admin>[] = [
+    { id: 'name', label: 'Name' },
+    { id: 'email', label: 'Email' },
+    {
+      id: 'isActive',
+      label: 'Status',
+      render: (value, row) => (
+        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+          <Switch
+            checked={row.isActive ?? false}
+            onChange={() => handleToggleActive(row)}
+            size="small"
+          />
+          <StatusChip
+            isActive={row.isActive}
+            sx={{ ml: 1 }}
+            onClick={() => handleToggleActive(row)}
+          />
+        </Box>
+      ),
+    },
+    {
+      id: 'createdAt',
+      label: 'Created',
+      render: (value) => new Date(value).toLocaleDateString(),
+    },
+    {
+      id: 'actions',
+      label: 'Actions',
+      render: (_, row) => (
+        <Box>
+          <IconButton onClick={() => handleOpenDialog(row)} size="small">
+            <Edit />
+          </IconButton>
+          <IconButton onClick={() => handleDelete(getIdFromRow(row))} size="small">
+            <Delete />
+          </IconButton>
+        </Box>
+      ),
+    },
+  ];
+
   return (
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
@@ -156,95 +190,28 @@ const Admins: React.FC = () => {
         </Alert>
       )}
 
-      <TextField
-        fullWidth
-        variant="outlined"
-        placeholder="Search admins..."
+      <SearchBar
         value={search}
         onChange={handleSearch}
+        placeholder="Search admins..."
         sx={{ mb: 2 }}
-        InputProps={{
-          startAdornment: (
-            <InputAdornment position="start">
-              <Search />
-            </InputAdornment>
-          ),
-        }}
       />
 
-      <TableContainer component={Paper}>
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableCell>Name</TableCell>
-              <TableCell>Email</TableCell>
-              <TableCell>Status</TableCell>
-              <TableCell>Created</TableCell>
-              <TableCell>Actions</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {loading ? (
-              <TableRow>
-                <TableCell colSpan={5} align="center">
-                  <CircularProgress />
-                </TableCell>
-              </TableRow>
-            ) : admins && admins.length > 0 ? (
-              admins.map((admin) => (
-                <TableRow key={admin.id}>
-                  <TableCell>{admin.name}</TableCell>
-                  <TableCell>{admin.email}</TableCell>
-                  <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                      <Switch
-                        checked={admin.isActive ?? false}
-                        onChange={() => handleToggleActive(admin)}
-                        size="small"
-                      />
-                      <Chip
-                        label={admin.isActive ? 'Active' : 'Inactive'}
-                        color={admin.isActive ? 'success' : 'default'}
-                        size="small"
-                        sx={{ ml: 1 }}
-                      />
-                    </Box>
-                  </TableCell>
-                  <TableCell>
-                    {new Date(admin.createdAt).toLocaleDateString()}
-                  </TableCell>
-                  <TableCell>
-                    <IconButton onClick={() => handleOpenDialog(admin)} size="small">
-                      <Edit />
-                    </IconButton>
-                    <IconButton onClick={() => handleDelete(admin.id?.toString() || '')} size="small">
-                      <Delete />
-                    </IconButton>
-                  </TableCell>
-                </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={5} align="center">
-                  No admins found
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-        <TablePagination
-          rowsPerPageOptions={[5, 10, 25]}
-          component="div"
-          count={total}
-          rowsPerPage={rowsPerPage}
-          page={page}
-          onPageChange={(_, newPage) => setPage(newPage)}
-          onRowsPerPageChange={(event) => {
-            setRowsPerPage(parseInt(event.target.value, 10));
-            setPage(0);
-          }}
-        />
-      </TableContainer>
+      <DataTable
+        columns={columns}
+        data={admins}
+        loading={loading}
+        total={total}
+        page={page}
+        rowsPerPage={rowsPerPage}
+        onPageChange={setPage}
+        onRowsPerPageChange={(newRowsPerPage) => {
+          setRowsPerPage(newRowsPerPage);
+          setPage(0);
+        }}
+        getRowId={getIdFromRow}
+        emptyMessage="No admins found"
+      />
 
       <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
         <DialogTitle>

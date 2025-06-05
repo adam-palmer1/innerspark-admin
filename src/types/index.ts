@@ -9,13 +9,7 @@ export interface Admin {
   updatedAt: string;
 }
 
-export interface AffirmationSlide {
-  _id?: string;
-  id: string;
-  title: string;
-  content: string | string[];
-  author?: string;
-}
+// Removed AffirmationSlide - no longer used in the current implementation
 
 export interface TagObject {
   id: number;
@@ -126,7 +120,6 @@ export interface Tag {
   description?: string;
   color?: string;
   usageCount: number;
-  currentUsageCount: number;
   createdAt: string;
   updatedAt: string;
 }
